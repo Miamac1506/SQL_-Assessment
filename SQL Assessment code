@@ -1,0 +1,277 @@
+--1
+-- What is the code for province Thái Bình in the database? - TBH
+SELECT *
+FROM dbo.city
+WHERE name = 'Thái Bình'
+
+--2 What province stands fro code HTH? Hà Tĩnh
+SELECT *
+FROM dbo.city
+WHERE code = 'HTH'
+
+--3 What's the position of Hà Nội in the list of province/city of Đồng bằng sông Hồng? - 3
+SELECT *
+FROM dbo.city c
+JOIN dbo.sub_region r on c.sub_region_id = r.id
+WHERE r.id = 1
+
+--4 How many Provinces have name starts with Quảng? - 5
+SELECT COUNT(Name)
+FROM dbo.city
+WHERE Name LIKE N'Quảng%'
+
+--5 What is the Percentage of provinces in area Đồng bằng sông Hồng and Đồng bằng sông Cửu Long compared to total provinces in Vietnam (Rounded to 2 decimal places)? - 38.1%
+SELECT COUNT(c.name)
+FROM dbo.city c
+JOIN dbo.sub_region sr on sr.id = c.sub_region_id
+WHERE sub_region_id = 1 OR sub_region_id =  6
+
+
+SELECT COUNT(c.name)
+FROM dbo.city c
+JOIN dbo.sub_region sr on sr.id = c.sub_region_id
+
+--6 How many provinces are in the Middle Area? 19
+SELECT COUNT(c.name)
+FROM dbo.region r
+JOIN dbo.sub_region sr on sr.region_id = r.id
+JOIN dbo.city c on c.sub_region_id = sr.id
+WHERE c.sub_region_id = 3 and c.sub_region_id =  4
+
+SELECT COUNT (name)
+FROM dbo.city
+WHERE sub_region_id = 3 OR sub_region_id = 4
+
+--7 Which province has the highest number of stores in the whole country? - Hoàng Mai
+SELECT COUNT(s.id) as Nbstores, d.name
+FROM dbo.store s
+JOIN dbo.district d on d.id = s.district_id
+GROUP BY s.district_id, d.id, d.name
+ORDER BY Nbstores DESC
+
+--8 How many wards in Hà Nội with more than 10 stores? - 10
+SELECT COUNT(s.id) as Nbstores, d.name
+FROM dbo.store s
+JOIN dbo.district d on d.id = s.district_id
+GROUP BY s.district_id, d.id, d.name
+HAVING COUNT(s.id) >10
+
+--9 Which province has the highest ratio of a number of stores to a number of wards? - Cầu Giấy
+SELECT (COUNT(s.id) ) / (COUNT(d.id)) as Ratio , d.name
+FROM dbo.store s
+JOIN dbo.district d on d.id = s.district_id
+JOIN dbo.city c on c.id = d.city_id
+GROUP BY s.district_id, d.id, d.name
+
+SELECT COUNT(s.id) as Nbstores, d.name
+FROM dbo.store s
+JOIN dbo.district d on d.id = s.district_id
+GROUP BY s.district_id, d.id, d.name
+
+SELECT COUNT (w.id) as NbWards, d.name
+FROM dbo.ward w
+JOIN dbo.district d on d.id = w.district_id
+GROUP BY w.district_id, d.id, d.name
+
+;WITH stores as (SELECT COUNT(s.id)*1.0 as Nbstores, d.name, s.district_id
+FROM dbo.store s
+JOIN dbo.district d on d.id = s.district_id
+GROUP BY s.district_id, d.id, d.name), wards as (SELECT COUNT (w.id) as NbWards, d.name,w.district_id
+FROM dbo.ward w
+JOIN dbo.district d on d.id = w.district_id
+GROUP BY w.district_id, d.id, d.name)
+SELECT (stores.Nbstores / wards.NbWards)as Ratio, d.name
+FROM dbo.district d
+JOIN stores on stores.district_id = d.id
+JOIN wards on wards.district_id = d.id
+ORDER BY Ratio DESC
+
+--10 Choose 3 stores neareast to store VMHNI60 -  VMHNI466, VMHNI735, VMHNI92
+;WITH d1 as  (SELECT latitude as lat1, longitude as long1, code
+FROM dbo.store
+WHERE code = 'VMHNI60'), d2 as (SELECT code,latitude as lat2, longitude as long2
+FROM dbo.store
+WHERE code <> 'VMHNI60')
+
+SELECT TOP(3) s.code,longitude as long2, latitude as lat2, dbo.fnc_calc_haversine_distance(d1.lat1,d1.long1,s.latitude,s.longitude) as distance, d1.lat1, d1.long1
+FROM dbo.store as s,  (SELECT latitude as lat1, longitude as long1, code
+FROM dbo.store
+WHERE code = 'VMHNI60') as d1
+WHERE s.code <> 'VMHNI60'
+ORDER BY distance 
+
+SELECT TOP(3) s.id,s.code,s.name,s.address,dbo.fnc_calc_haversine_distance(s63.latitude,s63.longitude,s.latitude,s.longitude) as distance,s63.latitude,s63.longitude,s.latitude,s.longitude
+FROM dbo.store s,(SELECT id,latitude,longitude 
+FROM dbo.store WHERE code='VMHNI60')s63 
+WHERE s.code <>'VMHNI60' 
+ORDER BY distance
+
+--11 Get a list of cities and provinces in the North. There is information about domain name, domain code, area name, area code, after id, name, code of province/city. 
+ The data table is arranged in alphabetical order by domain name, region name and city name. */
+
+SELECT r.code as region_code, r.name as region_name, sr.code as sub_region_code, sr.name as sub_region_name, c.id as city_id, c.code as city_code, c.name as city_name 
+FROM dbo.region r
+JOIN dbo.sub_region sr on sr.region_id = r.id
+JOIN dbo.city c on sr.id = c.sub_region_id
+WHERE r.id = 1
+ORDER BY r.name, sr.name, c.name
+
+--12 On the occasion of the establishment of the first branch in Hoan Kiem district - Hanoi, the company plans to organize a gratitude event for loyal customers. All customers with total accumulated purchase value (including VAT) from October 1, 2020 to October 20, 2020 at stores in Hoan Kiem district over 10 million VND will receive a purchase voucher 1 million dong. 
+Knowing that stores in Hoan Kiem district have district_id=1. Get a list of customers who are eligible to participate in the above promotion. The required information includes: customer code, full name, customer name, total purchase value. Sort by descending total purchase value and customer name in Alphabetical order. */
+
+SELECT customer_id, c.code, full_name, first_name,total_amount, transaction_date
+FROM dbo.pos_sales_header h
+JOIN dbo.customer c on c.id = h.customer_id
+GROUP BY customer_id, first_name, c.code, full_name, district_id,transaction_date, total_amount
+HAVING (SUM(total_amount) >= 10000000) AND district_id = 1 AND (transaction_date BETWEEN '2020-10-01' AND '2020-10-20')
+ORDER BY total_amount DESC, full_name
+
+SELECT customer_id, c.code, full_name, first_name,SUM(total_amount) as TotalAmount
+FROM dbo.pos_sales_header h
+JOIN dbo.customer c on c.id = h.customer_id
+GROUP BY  customer_id, store_id, transaction_date, customer_id, code, full_name, first_name, total_amount
+HAVING store_id = 1 AND (transaction_date BETWEEN '2020-10-01' AND '2020-10-20') AND SUM(total_amount) >= 10000000
+ORDER BY SUM(total_amount) DESC, full_name
+
+SELECT *
+FROM dbo.pos_sales_header
+
+
+
+--13 Every week, the lucky spin program will find 5 lucky orders and refund 50% for orders not more than 1 million VND. 
+The list of winning orders for the week from August 31, 2020, to September 6, 2020, are orders with the following document_code: 
+SO-VMHNI4-202009034389708, SO-VMHNI109-202008316193214, SO-VMHNI51-202008316193066, SO-VMHNI64 -202008316193112, SO-VMHNI48-202009016193491.Retrieve order information, information about lucky customers, and the amount of money the customer is refunded. The required information includes: order code, store code, store name, time of purchase, customer code, full name, customer name, 
+order value, the customer refunded the amount again. 
+
+SELECT document_code,store_id,s.code as store_code,s.name as store_name, transaction_date,
+customer_id,c.full_name,c.first_name,total_amount,
+CASE WHEN 0.5*total_amount >= POWER(10,6) THEN POWER(10,6) ELSE 0.5*total_amount END AS promotion_amount
+FROM dbo.pos_sales_header h
+JOIN dbo.store s on h.store_id=s.id
+JOIN dbo.customer c on h.customer_id=c.id
+WHERE document_code in (
+'SO-VMHNI4-202009034389708',
+'SO-VMHNI109-202008316193214',
+'SO-VMHNI51-202008316193066',
+'SO-VMHNI64-202008316193112',
+'SO-VMHNI48-202009016193491'
+) AND transaction_date >= '2020-08-31' AND transaction_date  <= '2020-09-6' 
+ORDER BY total_amount desc
+
+--14 Summarize sales and average number of products purchased each time a customer buys the product “Cháo Yến Mạch, Chà Là Và Hồ Đào | Herritage Mill, Úc (320 G)” in 2020. Know that the product's sku code is 91. 
+
+SELECT*
+FROM dbo.pos_sales_line
+
+SELECT product_sku_id, customer_id, SUM(line_amount) as purchase_amount, SUM(quantity) as quantity, COUNT (l.id) as nb_purchases, 
+(quantity /COUNT(l.id)) as avg_quantity_per_purchases
+FROM dbo.pos_sales_line l 
+JOIN dbo.product_sku s on s.id  = l.product_sku_id
+WHERE product_sku_id = 91 
+GROUP BY product_sku_id, customer_id, line_amount, quantity
+
+
+--15 Get a list of the top 20 best-selling instant noodles products in 2019 and 2020. Consider products in the instant food group (sub_category_id=19) and the product name has the word "Mì" or the word "Mỳ". Information returned includes year, product code, product name, country of origin, brand, selling price, quantity sold, sales rating by year. The returned list is sorted by year and by product rating. 
+
+SELECT TOP (20) YEAR (l.transaction_date) AS year, p.id AS product_sku_id, p.code, p.name, p.country, p.brand, l.unit_price, 
+    SUM (l.quantity) AS quantity, RANK () OVER (PARTITION BY YEAR (l.transaction_date) ORDER BY SUM (l.unit_price*quantity) DESC) AS rk
+FROM dbo.product_sku p 
+JOIN dbo.pos_sales_line l ON l.product_sku_id = p.id
+JOIN dbo.product_subcategory s ON s.id = p.product_subcategory_id
+JOIN dbo.product_category c ON c.id = s.product_category_id
+WHERE p.product_subcategory_id = 19
+AND YEAR (l.transaction_date) IN ('2019', '2020')
+AND (p.name LIKE '%Mì%' OR p.name LIKE '%Mỳ%')
+GROUP BY p.id, p.code, p.name, p.country, p.brand, l.unit_price, YEAR (l.transaction_date)
+ORDER BY YEAR (l.transaction_date) DESC, rk ASC
+ORDER BY transaction_date 
+
+--16 The store “Cụm 6, Xã Sen Chiểu, Huyện Phúc Thọ, Hà Nội” had customers complaining about the service quality and service attitude of the staff on the afternoon of June 13, 2020. Query information about employees working the afternoon shift on June 13, 2020 at the store. */
+
+SELECT day_work, p.store_id,name, shift_name, sales_person_id, p.code, full_name, first_name, gender
+FROM dbo.emp_shift_schedule s
+JOIN dbo.sales_person p on p.id = sales_person_id
+JOIN dbo.store t on t.id = s.store_id
+WHERE shift_name = N'Chiều' And day_work = '2020-06-13' AND s.store_id = 1
+
+
+--17 Analyze what time frame customers often come to buy in to coordinate enough staff to serve customers' shopping needs. Query the average number of customers who come to buy at each store per day according to each time frame of the day. Sales data is limited to the last 6 months of 2020. Let assume a staff to serve 8 customers / 1 hour, calculate at the peak time, how many employees each store needs. 
+
+WITH cus AS (
+    SELECT store_id, hour, AVG(nb_customers) AS avg_nb_customers
+    FROM (SELECT CAST (transaction_date as date) as dd, store_id, DATEPART (HOUR, transaction_date) as hour,
+            COUNT (distinct customer_id)*1.0 AS nb_customers
+        FROM dbo.pos_sales_header
+        WHERE CAST (transaction_date as date) BETWEEN '2020-06-01' AND '2020-12-31'
+        GROUP BY CAST (transaction_date as date), store_id, DATEPART(HOUR, transaction_date)
+    ) f
+    GROUP BY store_id, [hour]
+) 
+SELECT cus.store_id,  s.code, s.name AS store_name, cus.[hour], ROUND (avg_nb_customers,2) AS avg_nb_customers
+FROM cus
+JOIN dbo.store s ON s.id = cus.store_id
+ORDER BY store_id, [hour]
+--18 Currently, the chain is trading in 4 types of tea products: trà khô, trà túi lọc, trà hòa tan, trà chai. Tea products have sub_category_id=27. Based on the product field can be classified as follows: 
+  
+-- product contains word “trà khô” -> product_type=1
+-- product contains word “trà túi lọc” -> product_type=2
+-- product contains word “trà hòa tan” -> product_type=3
+-- product contains word “trà chai” -> product_type=4
+
+-- Calculate the ratio of sales of trà hòa tan to total sales of tea products in 2018, 2019, 2020. */
+
+ SELECT ps.id as product_sku_id, ps.code as product_sku_code, ps.name as product_sku_name, product,
+ CASE WHEN LOWER (product) LIKE N'%trà khô%' THEN 1
+ WHEN LOWER (product) LIKE N'%trà túi lọc%' THEN 2
+ WHEN LOWER(product) LIKE N'%trà hoà tan%' THEN 3
+ WHEN LOWER (product) LIKE N'%trà chai%' THEN 4
+ END AS product_type
+ FROM dbo.product_sku ps
+ JOIN dbo.product_subcategory sc on ps.product_subcategory_id = sc.id
+ WHERE sc.id = 27 
+
+--19  Based on sales in 2020, classify products into 3 groups A, B, C (ABC Analysis). Sort products by sales descending. Product group A is the products that account for 70% of total revenue, product group B is the products that account for 20% of total revenue, and product group C is the products that account for the remaining 10% of revenue. Query a list of products categorized by ABC group. Sort by line code and product group code, sales descending. 
+
+;with r as (
+SELECT year,product_sku_id,sales_amount,
+	SUM(sales_amount) OVER(PARTITION BY r.year ORDER BY sales_amount desc) as running_total,
+	SUM(sales_amount) OVER(PARTITION BY r.year) as year_total
+	FROM
+	(SELECT YEAR(transaction_date) as [year],product_sku_id, SUM(line_amount) as sales_amount
+		FROM dbo.pos_sales_line
+		WHERE YEAR(transaction_date)=2020
+		GROUP BY YEAR(transaction_date),product_sku_id
+	) r
+), dm as (
+SELECT ps.id as product_sku_id,ps.code as product_sku_code,ps.name as product_sku_name, 
+	sc.id as product_subcategory_id,sc.code as product_subcategory_code,sc.name as product_subcategory_name,
+	pc.id as product_category_id,pc.code as product_category_code,pc.name as product_category_name
+	FROM dbo.product_sku ps
+	JOIN dbo.product_subcategory sc on ps.product_subcategory_id=sc.id
+	JOIN dbo.product_category pc on pc.id=sc.product_category_id
+)
+
+SELECT
+year,product_category_id,product_category_name,
+product_subcategory_id,product_subcategory_name,
+r.product_sku_id,product_sku_name, sales_amount,
+CASE WHEN p < 70 THEN 'A' 
+WHEN p < 90 THEN 'B'
+ELSE 'C' END [type]
+FROM
+(SELECT r.*, running_total/year_total*100 as p
+	FROM r
+) r
+LEFT JOIN dm on r.product_sku_id=dm.product_sku_id
+ORDER BY r.year,product_category_id,product_subcategory_id,product_sku_id
+
+SELECT TOP(10) * FROM dbo.pos_sales_line
+
+--20 Requirement: Get the TOP 3 stores by sales in Hanoi to award the store for the month of October 2020. Know that stores in Hanoi have city_id=24. 
+
+SELECT TOP(3) store_id, code, name, SUM (line_amount) as sales_amount_10_2020
+FROM dbo.pos_sales_line l
+JOIN dbo.store s on store_id = s.id
+WHERE city_id = 24 AND transaction_date between '2020-10-01' and '2020-10-31'
+GROUP BY store_id, code, name
+ORDER BY sales_amount_10_2020 DESC
